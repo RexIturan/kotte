@@ -146,7 +146,7 @@ namespace kotte
         [[nodiscard]] static bool is_solid(EntityKind kind) noexcept;
         [[nodiscard]] static Vector2 cardinal_vector(CardinalDirection direction) noexcept;
         [[nodiscard]] CardinalDirection different_enemy_direction(CardinalDirection current_direction);
-        [[nodiscard]] bool owner_has_active_bomb(EntityHandle owner) const noexcept;
+        [[nodiscard]] bool owner_has_bomb_slots_open(EntityHandle owner) const noexcept;
         [[nodiscard]] static Vector2 tile_centre(Vector2 world_position) noexcept;
         [[nodiscard]] static Vector2 tile_centre(int column, int row) noexcept;
         [[nodiscard]] static Color entity_color(EntityKind kind) noexcept;
@@ -180,6 +180,7 @@ namespace kotte
         static constexpr int player_max_health_ = 5;
         static constexpr std::uint8_t player_init_bomb_reach_ = 1;
         static constexpr std::uint8_t player_init_max_bomb_reach_ = 20;
+        static constexpr int player_bomb_count_ = 3;
         static constexpr float pickup_spawn_change_ = 0.1f;
         // end new data
         

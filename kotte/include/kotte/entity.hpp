@@ -40,6 +40,7 @@ namespace kotte
     struct StatsState final {
         std::uint8_t bomb_reach = 0;
         std::uint8_t max_bomb_reach = 0;
+        int bomb_count = 1;
     };
 
     struct Entity final {

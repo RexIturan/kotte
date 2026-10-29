@@ -55,6 +55,7 @@ namespace kotte
         bomb_detonated_facts_.clear();
         destroy_entity_requests_.clear();
         damage_entity_requests_.clear();
+        spawn_pickup_request_.clear();
         blast_effects_.clear();
         
         init_game();
@@ -424,7 +425,7 @@ namespace kotte
         for(const PlaceBombRequest& request : place_bomb_requests_){
             const Entity* owner = entities_.try_get(request.owner);
             if(owner == nullptr || owner->kind != EntityKind::player
-                || owner_has_active_bomb(request.owner) || !owner->stats_state){
+                || !owner_has_bomb_slots_open(request.owner) || !owner->stats_state){
                 continue;
             }
             
@@ -896,6 +897,7 @@ namespace kotte
             .stats_state = StatsState{
                 .bomb_reach = player_init_bomb_reach_,
                 .max_bomb_reach = player_init_max_bomb_reach_,
+                .bomb_count = player_bomb_count_
             }
         };
         player_handle_ = entities_.create(player_entity);
@@ -1136,13 +1138,30 @@ namespace kotte
         return static_cast<CardinalDirection>(new_value);
     }
 
-    bool Application::owner_has_active_bomb(EntityHandle owner) const noexcept{
-        return std::ranges::any_of(active_bomb_handles_, [this, owner](EntityHandle bomb_handle){
-            const Entity* bomb = entities_.try_get(bomb_handle);
-            return bomb != nullptr
-                && bomb->bomb_state.has_value()
-                && bomb->bomb_state->owner == owner;
-        });
+    bool Application::owner_has_bomb_slots_open(EntityHandle owner) const noexcept{
+        auto owner_entity = entity(owner);
+        if (owner_entity.stats_state) {
+            const int bombCount = owner_entity.stats_state.value().bomb_count;
+            auto current_bomb_count = std::ranges::count_if(
+                active_bomb_handles_,
+                [this, owner](EntityHandle bomb_handle){
+                    const Entity* bomb = entities_.try_get(bomb_handle);
+                    return bomb != nullptr
+                        && bomb->bomb_state.has_value()
+                        && bomb->bomb_state->owner == owner;
+                });
+            
+            return current_bomb_count < bombCount;
+        }
+        
+        return false;
+        
+        // return std::ranges::any_of(active_bomb_handles_, [this, owner](EntityHandle bomb_handle){
+        //     const Entity* bomb = entities_.try_get(bomb_handle);
+        //     return bomb != nullptr
+        //         && bomb->bomb_state.has_value()
+        //         && bomb->bomb_state->owner == owner;
+        // });
     }
 
     Vector2 Application::tile_centre(Vector2 world_position) noexcept{
