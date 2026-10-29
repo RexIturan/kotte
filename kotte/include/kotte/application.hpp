@@ -84,6 +84,10 @@ namespace kotte
             Vector2 world_position;
         };
         
+        struct TriggerBombRequest final {
+            EntityHandle entity;
+        };
+        
         struct BlastEffect final {
             std::vector<Vector2> tile_centres;
             float remaining_seconds = 0.0f;
@@ -203,6 +207,7 @@ namespace kotte
         std::vector<BombDetonated> bomb_detonated_facts_;
         std::vector<DestroyEntityRequest> destroy_entity_requests_;
         std::vector<SpawnPickupRequest> spawn_pickup_request_;
+        std::vector<TriggerBombRequest> trigger_bomb_request_;
         // new buffer for damage
         std::vector<DamageEntityRequest> damage_entity_requests_;
         std::vector<BlastEffect> blast_effects_;

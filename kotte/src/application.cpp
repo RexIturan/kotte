@@ -56,6 +56,7 @@ namespace kotte
         destroy_entity_requests_.clear();
         damage_entity_requests_.clear();
         spawn_pickup_request_.clear();
+        trigger_bomb_request_.clear();
         blast_effects_.clear();
         
         init_game();
@@ -246,6 +247,15 @@ namespace kotte
         }
         
         damage_entity_requests_.clear();
+
+        for (auto request : trigger_bomb_request_) {
+            auto entity = entities_.try_get(request.entity);
+            if (entity && entity->bomb_state) {
+                entity->bomb_state.value().fuse_remaining = 0.0;    
+            }
+        }
+        
+        trigger_bomb_request_.clear();
     }
 
     void Application::apply_structural_mutations(){
@@ -532,6 +542,9 @@ namespace kotte
             switch(candidate->kind){
             case EntityKind::bomb:
                     //todo timer == 0
+                    
+                    trigger_bomb_request_.push_back({handle});
+                break;
             case EntityKind::enemy:
                 destroy_entity_requests_.push_back({handle});
                 break;
