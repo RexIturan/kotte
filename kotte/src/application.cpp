@@ -109,11 +109,11 @@ namespace kotte
     }
 
     void Application::update_gameplay(float delta_time){
-        
-        
         // The player and every enemy are movers; each asks its own collision question.
         update_player(delta_time);
         update_enemies(delta_time);
+        
+        check_bomb_clearance();
         
         // check enemy player collision?
         
@@ -216,7 +216,43 @@ namespace kotte
 
         update_camera(delta_time);
     }
-
+    
+    void Application::check_bomb_clearance() noexcept {
+        for (auto bomb_handle : active_bomb_handles_) {
+            Entity& bomb = entity(bomb_handle);
+            assert(bomb.bomb_state.has_value());
+            if (!bomb.bomb_state) {
+                continue;
+            }
+            
+            auto bomb_state = bomb.bomb_state.value();
+            auto bomb_bounds = entity_collision_bounds(bomb);
+            
+            if (bomb_state.owner_cleared) {
+                continue;
+            }
+            
+            const SpatialQuery spatial_query = spatial_grid_.query(bomb_bounds);
+            // ++collision_diagnostics_.spatial_queries;
+            // collision_diagnostics_.cells_visited += spatial_query.cells_visited;
+            // collision_diagnostics_.candidate_references += spatial_query.candidate_references;
+            // // These counters aggregate work across movers, not globally unique entities.
+            // collision_diagnostics_.unique_candidates += spatial_query.entity_handles.size();
+            
+            for(const EntityHandle candidate_handle : spatial_query.entity_handles) {
+                if (candidate_handle != bomb_state.owner) {
+                    continue;
+                }
+                
+                const Entity* candidate = entities_.try_get(candidate_handle);
+                if (!CheckCollisionRecs(bomb_bounds, entity_collision_bounds(*candidate))) {
+                    bomb.bomb_state.value().owner_cleared = true;
+                }
+            }
+          
+        }
+    }
+    
     void Application::update_player(float delta_time){
         const Vector2 direction = frame_actions_.player_movement_direction;
 
@@ -724,11 +760,7 @@ namespace kotte
                     continue;
                 }
                 const EntityKind kind = kind_roll < 15 ? EntityKind::crate : EntityKind::enemy;
-                const Vector2 world_position{
-                    static_cast<float>(x * tile_size_ + tile_size_ / 2),
-                    static_cast<float>(y * tile_size_ + tile_size_ / 2)
-                };
-                const Entity new_entity{kind, world_position};
+                const Entity new_entity = spawn_entity(x, y, kind);
                 const EntityHandle handle = entities_.create(new_entity);
                 spatial_grid_.insert(handle, entity_world_bounds(new_entity));
 
@@ -778,7 +810,9 @@ namespace kotte
         case EntityKind::enemy: size = {28.0f, 30.0f}; break;
         }
 
-        const Vector2 top_left = entity.world_position - Vector2{size.x / 2.0f, size.y};
+        const Vector2 top_left = entity.world_position
+            - entity_offset(entity.kind)
+            - Vector2{size.x / 2.0f, size.y};
         return {top_left.x, top_left.y, size.x, size.y};
     }
 
@@ -794,8 +828,27 @@ namespace kotte
         case EntityKind::enemy: size = {24.0f, 14.0f}; break;
         }
 
-        const Vector2 top_left = entity.world_position - Vector2{size.x / 2.0f, size.y};
+        const Vector2 top_left = entity.world_position
+            - entity_offset(entity.kind)
+            - Vector2{size.x / 2.0f, size.y};
         return {top_left.x, top_left.y, size.x, size.y};
+    }
+    
+    Entity Application::spawn_entity(int x, int y, EntityKind kind) const noexcept {
+        const Vector2 world_position = tile_centre(x, y);
+        return Entity{kind, world_position};
+    }
+    
+    Vector2 Application::entity_offset(const EntityKind kind) const noexcept {
+        Vector2 offset{0,0};
+        switch(kind){
+            case EntityKind::player: offset = {0, 0}; break;
+            case EntityKind::bomb:   offset = {0, -10}; break;
+            case EntityKind::crate:  offset = {0, -18}; break;
+            case EntityKind::enemy:  offset = {0, 0}; break;
+        }
+        
+        return offset;
     }
 
     bool Application::entity_movement_is_blocked(
@@ -842,6 +895,15 @@ namespace kotte
             if(candidate == nullptr || !is_solid(candidate->kind)){
                 continue;
             }
+            
+            // skip collision check if bomb is owned by moving entity and did not clear jet 
+            if (
+                candidate->bomb_state
+                && candidate->bomb_state.value().owner == moving_entity_handle
+                && !candidate->bomb_state.value().owner_cleared
+            ) {
+                continue;
+            }
 
             // Narrow phase: exact-test the remaining solid candidate.
             ++collision_diagnostics_.exact_tests;
@@ -877,7 +939,8 @@ namespace kotte
         case EntityKind::enemy:
             return true;
         case EntityKind::bomb:
-            return false;
+            // true for now, has special logic
+            return true;
         }
 
         return false;

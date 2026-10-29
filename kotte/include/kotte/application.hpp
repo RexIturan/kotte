@@ -87,6 +87,7 @@ namespace kotte
         void run_frame(float delta_time);
         void begin_frame() noexcept;
         void collect_frame_actions() noexcept;
+        void check_bomb_clearance() noexcept;
         void update_gameplay(float delta_time);
         void update_timed_gameplay(float delta_time);
         void resolve_gameplay_facts();
@@ -120,6 +121,10 @@ namespace kotte
         [[nodiscard]] const Entity& player() const noexcept;
         [[nodiscard]] Rectangle entity_world_bounds(const Entity& entity) const noexcept;
         [[nodiscard]] Rectangle entity_collision_bounds(const Entity& entity) const noexcept;
+        // new
+        [[nodiscard]] Entity spawn_entity(int x, int y, EntityKind kind) const noexcept;
+        [[nodiscard]] Vector2 entity_offset(EntityKind kind) const noexcept;
+        // stop new
         [[nodiscard]] bool entity_movement_is_blocked(
             EntityHandle moving_entity_handle,
             Vector2 proposed_position);
