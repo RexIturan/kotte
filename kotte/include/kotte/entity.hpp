@@ -28,11 +28,18 @@ namespace kotte
         std::uint8_t blast_range = 0;
         bool detonation_requested = false;
     };
+    
+    struct HealthState final {
+        int health = 0;
+        int max_health = 0;
+        bool is_dead = false;
+    };
 
     struct Entity final {
         EntityKind kind = EntityKind::crate;
         Vector2 world_position{};
         CardinalDirection movement_heading = CardinalDirection::right;
         std::optional<BombState> bomb_state;
+        std::optional<HealthState> health_state;
     };
 }

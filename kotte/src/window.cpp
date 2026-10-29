@@ -48,6 +48,15 @@ namespace kotte
         return GetScreenHeight();
     }
 
+    Rectangle Window::rect() const noexcept {
+        return {
+            0,
+            0,
+            static_cast<float>(width()),
+            static_cast<float>(height())
+        };
+    }
+
     Vector2 Window::size() const noexcept{
         return {static_cast<float>(width()), static_cast<float>(height())};
     }

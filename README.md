@@ -1,6 +1,6 @@
 # Bomberman World — [your game title]
 
-**Student:** [your name]
+**Student:** Vincent Jung
 
 > Replace the prompts below and remove these instructions. Keep answers brief. Your implementation explanations and reflection belong in the presentation; you do not need to write them out here. Complete the final section only if seeking Pass with Distinction (VG).
 

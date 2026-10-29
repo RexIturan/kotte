@@ -49,10 +49,26 @@ namespace kotte
         // boundaries visible as the simulation grows.
         begin_frame();
         collect_frame_actions();
-        update_gameplay(delta_time);
-        update_timed_gameplay(delta_time);
-        resolve_gameplay_facts();
-        apply_structural_mutations();
+        
+        // only run logic loop if playing
+        if (state_ == Game_Sate::Playing) {
+            update_gameplay(delta_time);
+            update_timed_gameplay(delta_time);
+            resolve_gameplay_facts();
+            apply_structural_mutations();
+            
+            // check game over
+            //todo move somewhere
+            // losing has priority
+            auto p_entity = player(); 
+            if (p_entity.health_state && p_entity.health_state.value().is_dead) {
+                state_ = Game_Sate::Lost;
+            }
+            if (enemy_handles_.empty()) {
+                state_ = Game_Sate::Won;
+            }
+        }
+        
         update_presentation(delta_time);
         render();
     }
@@ -93,9 +109,14 @@ namespace kotte
     }
 
     void Application::update_gameplay(float delta_time){
+        
+        
         // The player and every enemy are movers; each asks its own collision question.
         update_player(delta_time);
         update_enemies(delta_time);
+        
+        // check enemy player collision?
+        
         queue_bomb_placement();
     }
 
@@ -152,6 +173,31 @@ namespace kotte
         }
 
         bomb_detonated_facts_.clear();
+        
+        //todo is this the right place?
+        // allows for multiple instances of damage in one frame
+        for (DamageEntityRequest& damage_entity_request : damage_entity_requests_) {
+            Entity* entity = entities_.try_get(damage_entity_request.entity);
+            
+            // ignore dead and invalid entities
+            if (entity == nullptr || !entity->health_state.has_value() || entity->health_state.value().is_dead) {
+                continue;
+            }
+            
+            auto& health_state = entity->health_state.value();
+            
+            health_state.health -= damage_entity_request.damage;
+            if (health_state.health <= 0) {
+                health_state.is_dead = true;
+                if (entity->kind != EntityKind::player) {
+                    destroy_entity_requests_.push_back({damage_entity_request.entity});    
+                } else {
+                    // player died
+                }
+            }
+        }
+        
+        damage_entity_requests_.clear();
     }
 
     void Application::apply_structural_mutations(){
@@ -175,6 +221,11 @@ namespace kotte
         const Vector2 direction = frame_actions_.player_movement_direction;
 
         Entity& player_entity = player();
+        
+        if (player_entity.health_state.has_value() && player_entity.health_state.value().is_dead) {
+            return;
+        }
+        
         const Rectangle old_world_bounds = entity_world_bounds(player_entity);
         const Vector2 displacement = direction * (player_speed_ * delta_time);
 
@@ -323,7 +374,7 @@ namespace kotte
         std::erase_if(active_bomb_handles_, [this](EntityHandle handle){
             return !entities_.contains(handle);
         });
-
+        
         destroy_entity_requests_.clear();
     }
 
@@ -361,7 +412,9 @@ namespace kotte
                 blocked_by_crate = true;
                 break;
             case EntityKind::player:
-                // Player-hit consequences are outside the Week 6 lifetime seam.
+                // todo bomb damage in bomb entity?
+                constexpr int damage = 1;
+                damage_entity_requests_.push_back({handle, damage});    
                 break;
             }
         }
@@ -479,13 +532,28 @@ namespace kotte
             const RenderLayer layer = visible_candidate->kind == EntityKind::bomb
                 ? RenderLayer::ground
                 : RenderLayer::world;
-            renderer_.submit({
-                bounds,
-                entity_color(visible_candidate->kind),
-                layer,
-                visible_candidate->world_position.y,
-                entity_roundness(visible_candidate->kind)
-            });
+            
+            
+            if (visible_candidate->kind == EntityKind::player
+                && visible_candidate->health_state
+                && visible_candidate->health_state.value().is_dead
+            ) {
+                renderer_.submit({
+                    bounds,
+                    ColorBrightness(entity_color(visible_candidate->kind), -0.5),
+                    layer,
+                    visible_candidate->world_position.y,
+                    entity_roundness(visible_candidate->kind)
+                });                
+            } else {
+                renderer_.submit({
+                    bounds,
+                    entity_color(visible_candidate->kind),
+                    layer,
+                    visible_candidate->world_position.y,
+                    entity_roundness(visible_candidate->kind)
+                });    
+            }
         }
         renderer_.sort();
         renderer_.execute();
@@ -538,6 +606,7 @@ namespace kotte
             collision_diagnostics_.contacts);
         DrawText(diagnostics.c_str(), 10, 106, 20, RAYWHITE);
 
+        // bottom left
         diagnostics = std::format("seed: {}", seed_);
         DrawText(diagnostics.c_str(), 10, window_.height() - 78, 20, RAYWHITE);
 
@@ -546,14 +615,99 @@ namespace kotte
         DrawText(diagnostics.c_str(), 10, window_.height() - 54, 20, RAYWHITE);
 
         DrawText("move: WASD/arrows | bomb: Space | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
+        
+        //todo maybe move to hud function?
+        auto player_entity = player();
+        if (player_entity.health_state.has_value()) {
+            auto health_state = player_entity.health_state.value();
+            diagnostics = std::format(
+                "Health: {}/{}", health_state.health, health_state.max_health);
+        
+            // bottom right
+            DrawText(diagnostics.c_str(), window_.width() - 150, window_.height() - 30, 20, LIGHTGRAY);    
+        }
+
+        // game state debug
+        diagnostics = std::format("Game State: {}", get_game_state_name(state_));
+        
+        // calculate text positioning with right align
+        const Font font = GetFontDefault();
+        constexpr auto fontSize = 20;
+        Rectangle textContainerRect = {
+            static_cast<float>(window_.width()) - 220,
+            static_cast<float>(window_.height()) - 54,
+            200,
+            24
+        };
+        Vector2 textSize = MeasureTextEx(font, diagnostics.c_str(), (float)fontSize, fontSize*.1f);
+        Vector2 textPos = {
+            textContainerRect.x + Lerp(0.0f, textContainerRect.width  - textSize.x, ((float)2)*0.5f),
+            textContainerRect.y + Lerp(0.0f, textContainerRect.height - textSize.y, ((float)0)*0.5f)
+        };
+        
+        DrawTextEx(font, diagnostics.c_str(), textPos, (float)fontSize, fontSize * .1f, LIGHTGRAY);
+        
+        if (state_ != Game_Sate::Playing) {
+            render_game_over();
+        }
     }
 
+    void Application::render_game_over() {
+        const Font font = GetFontDefault();
+        constexpr auto fontSize = 40;
+        
+        Rectangle screenRect = window_.rect();
+        
+        // draw dark background
+        DrawRectangleRec(screenRect, ColorFromNormalized({0, 0, 0, 100}));
+        
+        // draw text
+        std::string text;
+        
+        if (state_ == Game_Sate::Won) {
+            text = "Game Won! Press R to restart!";
+        } else {
+            text = "Game Lost! Press R to restart!";
+        }
+        
+        Vector2 textSize = MeasureTextEx(font, text.c_str(), (float)fontSize, fontSize*.1f);
+        
+        Vector2 textPos = {
+            screenRect.x + Lerp(0.0f, screenRect.width  - textSize.x, ((float)1)*0.5f),
+            screenRect.y + Lerp(0.0f, screenRect.height - textSize.y, ((float)1)*0.5f)
+        };
+        
+        DrawTextEx(font, text.c_str(), textPos, (float)fontSize, fontSize * .1f, LIGHTGRAY);
+    }
+
+    std::string Application::get_game_state_name(Game_Sate state) noexcept {
+        switch (state) {
+            case Game_Sate::Playing:
+                return "Playing";
+            case Game_Sate::Won:
+                return "Won";
+            case Game_Sate::Lost:
+                return "Lost";
+        }
+        
+        return "";
+    } 
+    
     void Application::populate_entities(){
         // Match the generation density so initial creation does not repeatedly
         // relocate slot storage. Handles remain valid even if this estimate grows.
         entities_.reserve(map_.tile_count() / 4);
 
-        const Entity player_entity{EntityKind::player, {tile_size_ * 2.5f, tile_size_ * 2.5f}};
+        //create player
+        const Entity player_entity{
+            .kind = EntityKind::player,
+            .world_position = {tile_size_ * 2.5f, tile_size_ * 2.5f},
+            .health_state = HealthState{
+                .health = player_max_health_,
+                .max_health = player_max_health_,
+                .is_dead = false
+            },
+        };
         player_handle_ = entities_.create(player_entity);
         spatial_grid_.insert(player_handle_, entity_world_bounds(player_entity));
 
@@ -694,6 +848,22 @@ namespace kotte
             if(CheckCollisionRecs(proposed_collision_bounds, entity_collision_bounds(*candidate))){
                 ++collision_diagnostics_.contacts;
                 blocked = true;
+                
+                // we test collision between entities already
+                // and if there is a collision between player and enemy we want a reaction
+                // todo add a more detailed collision data struct so we can move the response outside this function
+                if (proposed_entity.kind != candidate->kind) {
+                    // todo store damage in enemy entity? 
+                    constexpr int enemy_damage = 1;
+                    
+                    // damage player
+                    if (proposed_entity.kind == EntityKind::player && candidate->kind == EntityKind::enemy) {
+                        damage_entity_requests_.push_back({moving_entity_handle, enemy_damage});
+                    }
+                    else if (candidate->kind == EntityKind::player) {
+                        damage_entity_requests_.push_back({candidate_handle, enemy_damage});
+                    }    
+                }
             }
         }
 

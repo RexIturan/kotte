@@ -17,6 +17,12 @@
 
 namespace kotte
 {
+    enum class Game_Sate {
+        Playing,
+        Won,
+        Lost
+    };
+    
     struct CollisionDiagnostics final {
         std::size_t enemy_updates = 0;
         std::size_t movement_attempts = 0;
@@ -68,6 +74,11 @@ namespace kotte
             EntityHandle entity;
         };
 
+        struct DamageEntityRequest final {
+            EntityHandle entity;
+            int damage;
+        };
+        
         struct BlastEffect final {
             std::vector<Vector2> tile_centres;
             float remaining_seconds = 0.0f;
@@ -100,6 +111,7 @@ namespace kotte
             std::uint8_t range);
         void update_camera(float delta_time) noexcept;
         void render();
+        void render_game_over();
         void populate_entities();
         void initialize_enemies();
         [[nodiscard]] Entity& entity(EntityHandle handle) noexcept;
@@ -119,6 +131,9 @@ namespace kotte
         [[nodiscard]] static Vector2 tile_centre(int column, int row) noexcept;
         [[nodiscard]] static Color entity_color(EntityKind kind) noexcept;
         [[nodiscard]] static float entity_roundness(EntityKind kind) noexcept;
+        
+        [[nodiscard]] static std::string get_game_state_name(Game_Sate state) noexcept;
+        
         static constexpr int tile_size_ = 40;
         static constexpr int spatial_cell_tiles_ = 8;
         static constexpr float spatial_cell_size_ = tile_size_ * spatial_cell_tiles_;
@@ -140,6 +155,14 @@ namespace kotte
         static constexpr Color enemy_color_{0xd9, 0x4f, 0x70, 0xff};
         static constexpr Color wall_color_{0x78, 0x5f, 0x47, 0xff};
 
+        // start new data
+        static constexpr int player_max_health_ = 5;
+        // end new data
+        
+        // start new state
+        Game_Sate state_ = Game_Sate::Playing;
+        // end new state
+        
         Window window_; // Constructed first, destroyed last.
         Camera camera_;
         Random random_;
@@ -153,6 +176,8 @@ namespace kotte
         std::vector<PlaceBombRequest> place_bomb_requests_;
         std::vector<BombDetonated> bomb_detonated_facts_;
         std::vector<DestroyEntityRequest> destroy_entity_requests_;
+        // new buffer for damage
+        std::vector<DamageEntityRequest> damage_entity_requests_;
         std::vector<BlastEffect> blast_effects_;
         CollisionDiagnostics collision_diagnostics_;
         std::uint64_t seed_;

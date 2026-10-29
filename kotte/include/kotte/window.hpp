@@ -30,6 +30,7 @@ namespace kotte
         [[nodiscard]] bool should_close() const noexcept;
         [[nodiscard]] int width() const noexcept;
         [[nodiscard]] int height() const noexcept;
+        [[nodiscard]] Rectangle rect() const noexcept;
         [[nodiscard]] Vector2 size() const noexcept;
     };
 }
