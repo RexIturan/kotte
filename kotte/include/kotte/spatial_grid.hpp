@@ -39,6 +39,7 @@ namespace kotte
         [[nodiscard]] int columns() const noexcept;
         [[nodiscard]] int rows() const noexcept;
         [[nodiscard]] float cell_size() const noexcept;
+        void clear();
 
     private:
         using Cell = std::vector<EntityHandle>;

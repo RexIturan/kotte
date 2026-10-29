@@ -87,6 +87,8 @@ namespace kotte
 
         void run_frame(float delta_time);
         void begin_frame() noexcept;
+        void reset_game();
+        void collect_frame_menu_actions() noexcept;
         void collect_frame_actions() noexcept;
         void check_bomb_clearance() noexcept;
         void update_gameplay(float delta_time);

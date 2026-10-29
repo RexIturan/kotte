@@ -26,6 +26,7 @@ namespace kotte
 
         [[nodiscard]] std::size_t live_count() const noexcept;
         [[nodiscard]] std::size_t slot_count() const noexcept;
+        void clear();
 
     private:
         static constexpr std::uint32_t first_generation_ = 1;

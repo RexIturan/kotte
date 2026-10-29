@@ -97,6 +97,14 @@ namespace kotte
         return cell_size_;
     }
 
+    void SpatialGrid::clear() {
+        for (auto entity_handles : cells_) {
+            entity_handles.clear();
+        } 
+        cells_.clear();
+        cells_.resize(static_cast<std::size_t>(columns_) * static_cast<std::size_t>(rows_));
+    }
+
     CellRange SpatialGrid::cells_overlapping(Rectangle world_bounds) const noexcept{
         if(world_bounds.width <= 0.0f || world_bounds.height <= 0.0f){
             return {};

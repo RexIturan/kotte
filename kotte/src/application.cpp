@@ -28,6 +28,36 @@ namespace kotte
         initialize_enemies();
     }
 
+    void Application::reset_game() {
+        // destroy spacial grid
+        spatial_grid_.clear();
+        
+        // delete entities store
+        entities_.clear();
+        
+        // delete entities handles
+        // clear handles
+        enemy_handles_.clear();
+        active_bomb_handles_.clear();
+        
+        // clear requests
+        destroy_entity_requests_.clear();
+        place_bomb_requests_.clear();
+        bomb_detonated_facts_.clear();
+        destroy_entity_requests_.clear();
+        damage_entity_requests_.clear();
+        blast_effects_.clear();
+        
+        random_ = Random{seed_};
+        map_ = TileMap{make_room(20, 12, random_)};
+        
+        // recreate game
+        populate_entities();
+        initialize_enemies();
+        
+        state_ = Game_Sate::Playing;
+    }
+        
     void Application::run(){
         while(!window_.should_close() && !exit_requested_){
             run_frame(GetFrameTime());
@@ -48,10 +78,10 @@ namespace kotte
         // Keeping one call site per phase makes event lifetime and mutation
         // boundaries visible as the simulation grows.
         begin_frame();
-        collect_frame_actions();
         
         // only run logic loop if playing
         if (state_ == Game_Sate::Playing) {
+            collect_frame_actions();
             update_gameplay(delta_time);
             update_timed_gameplay(delta_time);
             resolve_gameplay_facts();
@@ -67,6 +97,8 @@ namespace kotte
             if (enemy_handles_.empty()) {
                 state_ = Game_Sate::Won;
             }
+        } else {
+            collect_frame_menu_actions();    
         }
         
         update_presentation(delta_time);
@@ -80,6 +112,16 @@ namespace kotte
         assert(destroy_entity_requests_.empty());
         frame_actions_ = {};
         collision_diagnostics_ = {};
+    }
+
+    void Application::collect_frame_menu_actions() noexcept {
+        if(IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_Q)){
+            request_exit();
+        }
+        
+        if (IsKeyPressed(KEY_R)){
+            reset_game();
+        }
     }
 
     void Application::collect_frame_actions() noexcept{
