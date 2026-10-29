@@ -19,7 +19,7 @@ namespace kotte
         : window_{width, height, title, target_fps}
         , camera_{window_.size()}
         , random_{seed}
-        , map_{make_room(200, 120, random_)}
+        , map_{make_room(20, 12, random_)}
         , spatial_grid_{{
             static_cast<float>(map_.width() * tile_size_),
             static_cast<float>(map_.height() * tile_size_)}, spatial_cell_size_}
@@ -484,6 +484,164 @@ namespace kotte
         camera_.set_centre(player().world_position);
     }
 
+    void Application::render_debug_hud(
+        std::size_t visible_entities, std::size_t tiles_rendered, std::size_t exact_visibility_tests
+    ) {
+        std::string diagnostics;
+        const double percent_of_entities = entities_.live_count() == 0
+            ? 0.0
+            : 100.0 * static_cast<double>(visible_entities) / static_cast<double>(entities_.live_count());
+
+        // A naive collision loop would test every entity for every movement
+        // attempt. Compare that full-scan count with the local broad-phase
+        // candidates; this is candidate reduction, not a measured FPS gain.
+        const double naive_collision_work = static_cast<double>(collision_diagnostics_.movement_attempts)
+            * static_cast<double>(entities_.live_count());
+        const double broad_phase_reduction = naive_collision_work == 0.0
+            ? 0.0
+            : 100.0 * (1.0 - static_cast<double>(collision_diagnostics_.unique_candidates) / naive_collision_work);
+
+        DrawFPS(GetScreenWidth() - 100, 2);
+
+        const double percent_of_world = map_.tile_count() == 0
+            ? 0.0
+            : 100.0 * static_cast<double>(tiles_rendered) / static_cast<double>(map_.tile_count());
+        diagnostics = std::format(
+            "tiles rendered: {} ({:.1f}% of world)", tiles_rendered, percent_of_world);
+        DrawText(diagnostics.c_str(), 10, 10, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "entities: {} visible ({:.1f}% of {}) | {} visibility tests | {} commands",
+            visible_entities,
+            percent_of_entities,
+            entities_.live_count(),
+            exact_visibility_tests,
+            renderer_.command_count());
+        DrawText(diagnostics.c_str(), 10, 34, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "enemies updated: {} | active bombs: {} | blast effects: {}",
+            collision_diagnostics_.enemy_updates,
+            active_bomb_handles_.size(),
+            blast_effects_.size());
+        DrawText(diagnostics.c_str(), 10, 58, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "broad phase: {} candidates | {:.1f}% fewer than full scan",
+            collision_diagnostics_.unique_candidates, broad_phase_reduction);
+        DrawText(diagnostics.c_str(), 10, 82, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "narrow phase: {} exact tests | {} contacts",
+            collision_diagnostics_.exact_tests,
+            collision_diagnostics_.contacts);
+        DrawText(diagnostics.c_str(), 10, 106, 20, RAYWHITE);
+
+        // bottom left
+        diagnostics = std::format("seed: {}", seed_);
+        DrawText(diagnostics.c_str(), 10, window_.height() - 78, 20, RAYWHITE);
+
+        diagnostics = std::format(
+            "world: {} x {} tiles | {} total", map_.width(), map_.height(), map_.tile_count());
+        DrawText(diagnostics.c_str(), 10, window_.height() - 54, 20, RAYWHITE);
+
+        DrawText("move: WASD/arrows | bomb: Space | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
+    }
+
+    void Application::render_hud() {
+        std::string diagnostics;
+        
+        diagnostics = std::format(
+            "Enemies: {}", enemy_handles_.size());
+        
+        // bottom right
+        DrawText(diagnostics.c_str(), window_.width() - 150, window_.height() - 78, 20, LIGHTGRAY);    
+        
+
+        // game state debug
+        diagnostics = std::format("Game State: {}", get_game_state_name(state_));
+        
+        // calculate text positioning with right align
+        const Font font = GetFontDefault();
+        constexpr auto fontSize = 20;
+        Rectangle textContainerRect = {
+            static_cast<float>(window_.width()) - 220,
+            static_cast<float>(window_.height()) - 54,
+            200,
+            24
+        };
+        Vector2 textSize = MeasureTextEx(font, diagnostics.c_str(), (float)fontSize, fontSize*.1f);
+        Vector2 textPos = {
+            textContainerRect.x + Lerp(0.0f, textContainerRect.width  - textSize.x, ((float)2)*0.5f),
+            textContainerRect.y + Lerp(0.0f, textContainerRect.height - textSize.y, ((float)0)*0.5f)
+        };
+        
+        DrawTextEx(font, diagnostics.c_str(), textPos, (float)fontSize, fontSize * .1f, LIGHTGRAY);
+        
+        auto player_entity = player();
+        if (player_entity.health_state.has_value()) {
+            auto health_state = player_entity.health_state.value();
+            diagnostics = std::format(
+                "Health: {}/{}", health_state.health, health_state.max_health);
+        
+            // bottom right
+            DrawText(diagnostics.c_str(), window_.width() - 150, window_.height() - 30, 20, LIGHTGRAY);    
+        }
+    }
+
+    void Application::render_start_hud() {
+        
+        const Font font = GetFontDefault();
+        constexpr auto fontSize = 40;
+        
+        Rectangle screenRect = window_.rect();
+        
+        // draw dark background
+        DrawRectangleRec(screenRect, ColorFromNormalized({0, 0, 0, 100}));
+        
+        // draw text
+        std::string text;
+        
+        text = "Kill all Enemies! Press R to start!";
+        
+        Vector2 textSize = MeasureTextEx(font, text.c_str(), (float)fontSize, fontSize*.1f);
+        
+        Vector2 textPos = {
+            screenRect.x + Lerp(0.0f, screenRect.width  - textSize.x, ((float)1)*0.5f),
+            screenRect.y + Lerp(0.0f, screenRect.height - textSize.y, ((float)1)*0.5f)
+        };
+        
+        DrawTextEx(font, text.c_str(), textPos, (float)fontSize, fontSize * .1f, LIGHTGRAY);
+    }
+
+    void Application::render_game_over() const {
+        const Font font = GetFontDefault();
+        constexpr auto fontSize = 40;
+        
+        Rectangle screenRect = window_.rect();
+        
+        // draw dark background
+        DrawRectangleRec(screenRect, ColorFromNormalized({0, 0, 0, 100}));
+        
+        // draw text
+        std::string text;
+        
+        if (state_ == Game_Sate::Won) {
+            text = "Game Won! Press R to restart!";
+        } else {
+            text = "Game Lost! Press R to restart!";
+        }
+        
+        Vector2 textSize = MeasureTextEx(font, text.c_str(), (float)fontSize, fontSize*.1f);
+        
+        Vector2 textPos = {
+            screenRect.x + Lerp(0.0f, screenRect.width  - textSize.x, ((float)1)*0.5f),
+            screenRect.y + Lerp(0.0f, screenRect.height - textSize.y, ((float)1)*0.5f)
+        };
+        
+        DrawTextEx(font, text.c_str(), textPos, (float)fontSize, fontSize * .1f, LIGHTGRAY);
+    }
+    
     void Application::render(){
         Frame frame{background_color_};
 
@@ -594,126 +752,17 @@ namespace kotte
         renderer_.sort();
         renderer_.execute();
 
-        std::string diagnostics;
-        const double percent_of_entities = entities_.live_count() == 0
-            ? 0.0
-            : 100.0 * static_cast<double>(visible_entities) / static_cast<double>(entities_.live_count());
-
-        // A naive collision loop would test every entity for every movement
-        // attempt. Compare that full-scan count with the local broad-phase
-        // candidates; this is candidate reduction, not a measured FPS gain.
-        const double naive_collision_work = static_cast<double>(collision_diagnostics_.movement_attempts)
-            * static_cast<double>(entities_.live_count());
-        const double broad_phase_reduction = naive_collision_work == 0.0
-            ? 0.0
-            : 100.0 * (1.0 - static_cast<double>(collision_diagnostics_.unique_candidates) / naive_collision_work);
-
-        DrawFPS(GetScreenWidth() - 100, 2);
-
-        const double percent_of_world = map_.tile_count() == 0 ? 0.0 : 100.0 * static_cast<double>(tiles_rendered) / static_cast<double>(map_.tile_count());
-        diagnostics = std::format(
-            "tiles rendered: {} ({:.1f}% of world)", tiles_rendered, percent_of_world);
-        DrawText(diagnostics.c_str(), 10, 10, 20, RAYWHITE);
-
-        diagnostics = std::format(
-            "entities: {} visible ({:.1f}% of {}) | {} visibility tests | {} commands",
-            visible_entities,
-            percent_of_entities,
-            entities_.live_count(),
-            exact_visibility_tests,
-            renderer_.command_count());
-        DrawText(diagnostics.c_str(), 10, 34, 20, RAYWHITE);
-
-        diagnostics = std::format(
-            "enemies updated: {} | active bombs: {} | blast effects: {}",
-            collision_diagnostics_.enemy_updates,
-            active_bomb_handles_.size(),
-            blast_effects_.size());
-        DrawText(diagnostics.c_str(), 10, 58, 20, RAYWHITE);
-
-        diagnostics = std::format(
-            "broad phase: {} candidates | {:.1f}% fewer than full scan",
-            collision_diagnostics_.unique_candidates, broad_phase_reduction);
-        DrawText(diagnostics.c_str(), 10, 82, 20, RAYWHITE);
-
-        diagnostics = std::format(
-            "narrow phase: {} exact tests | {} contacts",
-            collision_diagnostics_.exact_tests,
-            collision_diagnostics_.contacts);
-        DrawText(diagnostics.c_str(), 10, 106, 20, RAYWHITE);
-
-        // bottom left
-        diagnostics = std::format("seed: {}", seed_);
-        DrawText(diagnostics.c_str(), 10, window_.height() - 78, 20, RAYWHITE);
-
-        diagnostics = std::format(
-            "world: {} x {} tiles | {} total", map_.width(), map_.height(), map_.tile_count());
-        DrawText(diagnostics.c_str(), 10, window_.height() - 54, 20, RAYWHITE);
-
-        DrawText("move: WASD/arrows | bomb: Space | quit: Q/Escape", 10, window_.height() - 30, 20, LIGHTGRAY);
+        render_debug_hud(visible_entities, tiles_rendered, exact_visibility_tests);
         
-        //todo maybe move to hud function?
-        auto player_entity = player();
-        if (player_entity.health_state.has_value()) {
-            auto health_state = player_entity.health_state.value();
-            diagnostics = std::format(
-                "Health: {}/{}", health_state.health, health_state.max_health);
+        render_hud();
         
-            // bottom right
-            DrawText(diagnostics.c_str(), window_.width() - 150, window_.height() - 30, 20, LIGHTGRAY);    
+        if (state_ == Game_Sate::Start) {
+            render_start_hud();
         }
-
-        // game state debug
-        diagnostics = std::format("Game State: {}", get_game_state_name(state_));
         
-        // calculate text positioning with right align
-        const Font font = GetFontDefault();
-        constexpr auto fontSize = 20;
-        Rectangle textContainerRect = {
-            static_cast<float>(window_.width()) - 220,
-            static_cast<float>(window_.height()) - 54,
-            200,
-            24
-        };
-        Vector2 textSize = MeasureTextEx(font, diagnostics.c_str(), (float)fontSize, fontSize*.1f);
-        Vector2 textPos = {
-            textContainerRect.x + Lerp(0.0f, textContainerRect.width  - textSize.x, ((float)2)*0.5f),
-            textContainerRect.y + Lerp(0.0f, textContainerRect.height - textSize.y, ((float)0)*0.5f)
-        };
-        
-        DrawTextEx(font, diagnostics.c_str(), textPos, (float)fontSize, fontSize * .1f, LIGHTGRAY);
-        
-        if (state_ != Game_Sate::Playing) {
+        if (state_ == Game_Sate::Won || state_ == Game_Sate::Lost) {
             render_game_over();
         }
-    }
-
-    void Application::render_game_over() {
-        const Font font = GetFontDefault();
-        constexpr auto fontSize = 40;
-        
-        Rectangle screenRect = window_.rect();
-        
-        // draw dark background
-        DrawRectangleRec(screenRect, ColorFromNormalized({0, 0, 0, 100}));
-        
-        // draw text
-        std::string text;
-        
-        if (state_ == Game_Sate::Won) {
-            text = "Game Won! Press R to restart!";
-        } else {
-            text = "Game Lost! Press R to restart!";
-        }
-        
-        Vector2 textSize = MeasureTextEx(font, text.c_str(), (float)fontSize, fontSize*.1f);
-        
-        Vector2 textPos = {
-            screenRect.x + Lerp(0.0f, screenRect.width  - textSize.x, ((float)1)*0.5f),
-            screenRect.y + Lerp(0.0f, screenRect.height - textSize.y, ((float)1)*0.5f)
-        };
-        
-        DrawTextEx(font, text.c_str(), textPos, (float)fontSize, fontSize * .1f, LIGHTGRAY);
     }
 
     std::string Application::get_game_state_name(Game_Sate state) noexcept {
@@ -724,6 +773,8 @@ namespace kotte
                 return "Won";
             case Game_Sate::Lost:
                 return "Lost";
+            case Game_Sate::Start:
+                return "Start";
         }
         
         return "";

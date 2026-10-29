@@ -18,6 +18,7 @@
 namespace kotte
 {
     enum class Game_Sate {
+        Start,
         Playing,
         Won,
         Lost
@@ -111,8 +112,13 @@ namespace kotte
             int row_step,
             std::uint8_t range);
         void update_camera(float delta_time) noexcept;
+        void render_debug_hud(
+            std::size_t visible_entities, std::size_t tiles_rendered, std::size_t exact_visibility_tests
+        );
+        void render_hud();
+        void render_start_hud();
         void render();
-        void render_game_over();
+        void render_game_over() const;
         void populate_entities();
         void initialize_enemies();
         [[nodiscard]] Entity& entity(EntityHandle handle) noexcept;
@@ -165,7 +171,7 @@ namespace kotte
         // end new data
         
         // start new state
-        Game_Sate state_ = Game_Sate::Playing;
+        Game_Sate state_ = Game_Sate::Start;
         // end new state
         
         Window window_; // Constructed first, destroyed last.
