@@ -12,7 +12,8 @@ namespace kotte
         player,
         bomb,
         crate,
-        enemy
+        enemy,
+        pickup
     };
 
     enum class CardinalDirection : std::uint8_t {
@@ -35,6 +36,11 @@ namespace kotte
         int max_health = 0;
         bool is_dead = false;
     };
+    
+    struct StatsState final {
+        std::uint8_t bomb_reach = 0;
+        std::uint8_t max_bomb_reach = 0;
+    };
 
     struct Entity final {
         EntityKind kind = EntityKind::crate;
@@ -42,5 +48,6 @@ namespace kotte
         CardinalDirection movement_heading = CardinalDirection::right;
         std::optional<BombState> bomb_state;
         std::optional<HealthState> health_state;
+        std::optional<StatsState> stats_state;
     };
 }

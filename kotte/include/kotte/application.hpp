@@ -80,6 +80,10 @@ namespace kotte
             int damage;
         };
         
+        struct SpawnPickupRequest final {
+            Vector2 world_position;
+        };
+        
         struct BlastEffect final {
             std::vector<Vector2> tile_centres;
             float remaining_seconds = 0.0f;
@@ -87,13 +91,16 @@ namespace kotte
 
         void run_frame(float delta_time);
         void begin_frame() noexcept;
+        void init_game();
         void reset_game();
         void collect_frame_menu_actions() noexcept;
         void collect_frame_actions() noexcept;
         void check_bomb_clearance() noexcept;
+        void update_pickups();
         void update_gameplay(float delta_time);
         void update_timed_gameplay(float delta_time);
         void resolve_gameplay_facts();
+        void apply_pickup_spawn();
         void apply_structural_mutations();
         void update_presentation(float delta_time);
         void update_player(float delta_time);
@@ -153,7 +160,7 @@ namespace kotte
         static constexpr float player_speed_ = 240.0f;
         static constexpr float enemy_speed_ = 80.0f;
         static constexpr float bomb_fuse_seconds_ = 2.0f;
-        static constexpr std::uint8_t bomb_blast_range_ = 3;
+        // static constexpr std::uint8_t bomb_blast_range_ = 3;
         static constexpr float blast_effect_seconds_ = 0.35f;
         static constexpr Color background_color_{0x11, 0x22, 0x33, 0xff};
         static constexpr Color floor_colors_[3]{
@@ -166,10 +173,14 @@ namespace kotte
         static constexpr Color blast_color_{0xf2, 0x8f, 0x3b, 0xe8};
         static constexpr Color crate_color_{0xb0, 0x72, 0x3c, 0xff};
         static constexpr Color enemy_color_{0xd9, 0x4f, 0x70, 0xff};
+        static constexpr Color pickup_color_{0x67, 0x4D, 0xF0, 0xff};
         static constexpr Color wall_color_{0x78, 0x5f, 0x47, 0xff};
 
         // start new data
         static constexpr int player_max_health_ = 5;
+        static constexpr std::uint8_t player_init_bomb_reach_ = 1;
+        static constexpr std::uint8_t player_init_max_bomb_reach_ = 20;
+        static constexpr float pickup_spawn_change_ = 0.1f;
         // end new data
         
         // start new state
@@ -183,12 +194,14 @@ namespace kotte
         EntityStore entities_;
         std::vector<EntityHandle> enemy_handles_;
         std::vector<EntityHandle> active_bomb_handles_;
+        std::vector<EntityHandle> pickup_handles_;
         SpatialGrid spatial_grid_;
         Renderer renderer_;
         FrameActions frame_actions_;
         std::vector<PlaceBombRequest> place_bomb_requests_;
         std::vector<BombDetonated> bomb_detonated_facts_;
         std::vector<DestroyEntityRequest> destroy_entity_requests_;
+        std::vector<SpawnPickupRequest> spawn_pickup_request_;
         // new buffer for damage
         std::vector<DamageEntityRequest> damage_entity_requests_;
         std::vector<BlastEffect> blast_effects_;
