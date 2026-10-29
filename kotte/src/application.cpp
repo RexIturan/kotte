@@ -425,9 +425,10 @@ namespace kotte
 
         // Capture values rather than an Entity reference because the request
         // deliberately outlives this simulation phase.
+        const Vector2 player_bomb_place_offset = Vector2{0, entity_collision_bounds(player()).height/2}; 
         place_bomb_requests_.push_back({
             player_handle_,
-            tile_centre(player().world_position)
+            tile_centre(player().world_position - player_bomb_place_offset)
         });
     }
 
@@ -450,6 +451,29 @@ namespace kotte
                     .blast_range = stats.bomb_reach
                 }
             };
+            
+            auto query_result = spatial_grid_.query(entity_collision_bounds(bomb));
+            bool blocked = false;
+            for (auto potential_blocker : query_result.entity_handles) {
+                auto entity = entities_.try_get(potential_blocker);
+                if (!entity) {
+                    continue;
+                }
+                
+                if (CheckCollisionRecs(entity_collision_bounds(bomb), entity_collision_bounds(*entity))) {
+                    switch (entity->kind) {
+                        case EntityKind::crate:
+                        case EntityKind::bomb:
+                            blocked = true;
+                        default: break;
+                    }
+                }
+            }
+            
+            if (blocked) {
+                continue;
+            }
+            
             const EntityHandle bomb_handle = entities_.create(bomb);
 
             // The store owns the bomb; these handles are synchronized, non-owning
