@@ -173,6 +173,7 @@ namespace kotte
             Color{0x42, 0x55, 0x60, 0xff}
         };
         static constexpr Color player_color_{0xf2, 0xc1, 0x4e, 0xff};
+        static constexpr Color shield_color_{0x00, 0x00, 0xff, 0x60};
         static constexpr Color bomb_color_{0x20, 0x24, 0x2a, 0xff};
         static constexpr Color blast_color_{0xf2, 0x8f, 0x3b, 0xe8};
         static constexpr Color crate_color_{0xb0, 0x72, 0x3c, 0xff};
@@ -186,7 +187,7 @@ namespace kotte
         static constexpr std::uint8_t player_init_max_bomb_reach_ = 10;
         static constexpr int player_bomb_count_ = 3;
         static constexpr float pickup_spawn_change_ = 0.1f;
-        static constexpr float player_invulnerability_timer_ = 0.3f;
+        static constexpr float player_invulnerability_timer_ = 1.f;
         static constexpr int kills_to_win = 10;
         // end new data
         

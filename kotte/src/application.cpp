@@ -912,17 +912,39 @@ namespace kotte
                     : RenderLayer::world;
                 
                 
-                if (visible_candidate->kind == EntityKind::player
-                    && visible_candidate->health_state
-                    && visible_candidate->health_state.value().is_dead
-                ) {
-                    renderer_.submit({
-                        bounds,
-                        ColorBrightness(entity_color(visible_candidate->kind), -0.5),
-                        layer,
-                        visible_candidate->world_position.y,
-                        entity_roundness(visible_candidate->kind)
-                    });                
+                if (visible_candidate->kind == EntityKind::player) {
+                    if (visible_candidate->health_state
+                        && visible_candidate->health_state.value().is_dead
+                    ) {
+                        renderer_.submit({
+                            bounds,
+                            ColorBrightness(entity_color(visible_candidate->kind), -0.5),
+                            layer,
+                            visible_candidate->world_position.y,
+                            entity_roundness(visible_candidate->kind)
+                        });    
+                    }
+                    else if (
+                        visible_candidate->invulnerability_state
+                        && visible_candidate->invulnerability_state->active
+                    ) {
+                        renderer_.submit({
+                            bounds,
+                            shield_color_,
+                            layer,
+                            visible_candidate->world_position.y,
+                            entity_roundness(visible_candidate->kind)
+                        });
+                    }
+                    else {
+                        renderer_.submit({
+                            bounds,
+                            entity_color(visible_candidate->kind),
+                            layer,
+                            visible_candidate->world_position.y,
+                            entity_roundness(visible_candidate->kind)
+                        });    
+                    }
                 } else {
                     renderer_.submit({
                         bounds,
