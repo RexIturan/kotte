@@ -43,28 +43,4 @@ This project builds on the shared Kotte foundations.
 - raylib cheatsheet: https://www.raylib.com/cheatsheet/cheatsheet.html
 - “None beyond the course material”
 
-## Architectural investigation — VG only
-
-Delete this section for a G submission. For VG, pose a focused engineering question about one decision in your implementation, investigate it, and draw a conclusion from evidence. Documenting the explanation already required for G is not enough. Aim for half a page to one page, excluding small tables, diagrams, or code excerpts. You can use the same decision in your presentation too.
-
-### Decision
-
-[State the question you are investigating and the implementation decision it concerns. Describe your current approach and a plausible alternative. Identify the relevant code. You do not need to implement the alternative.]
-
-### Method
-
-[How did you investigate the decision? Give enough detail to reproduce the key observation: setup, input, configuration/seed, and the test, trace, debugger inspection, or other method used.]
-
-### Evidence
-
-[What did you actually observe in your game? Include the relevant result or a small excerpt, table, or link to supporting material.]
-
-### Interpretation
-
-[Explain why it happened using the relevant code or architecture. Analyse at least one edge case, failure, defect, limitation, or trade-off illustrated by the investigation. Discuss relevant consequences for correctness, maintainability, performance, and/or scalability; you do not need to cover all four.]
-
-### Conclusion
-
-[When is your approach appropriate, what limits it, and when might an alternative become preferable? Base the conclusion on your evidence. Confirming that the current approach is suitable is a valid result.]
-
 <!-- Submission: commit and push this README with your source to GitHub or the internal Gitea server. Submit the final commit link and a runnable Release ZIP from that version in Studium. Ensure the teacher can access the repository throughout assessment. -->
