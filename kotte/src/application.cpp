@@ -29,7 +29,7 @@ namespace kotte
 
     void Application::init_game() {
         random_ = Random{seed_};
-        map_ = TileMap{make_room(100, 60, random_)};
+        map_ = TileMap{make_room(50, 50, random_)};
         
         // recreate game
         populate_entities();
@@ -956,6 +956,11 @@ namespace kotte
                     kind_roll < 16
                         ? EntityKind::crate
                         : EntityKind::enemy;
+                
+                if (kind == EntityKind::enemy && y == 1) {
+                    continue;
+                }
+                
                 const Entity new_entity = spawn_entity(x, y, kind);
                 const EntityHandle handle = entities_.create(new_entity);
                 spatial_grid_.insert(handle, entity_world_bounds(new_entity));
