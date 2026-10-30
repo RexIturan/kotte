@@ -42,6 +42,12 @@ namespace kotte
         std::uint8_t max_bomb_reach = 0;
         int bomb_count = 1;
     };
+    
+    struct InvulnerabilityState final {
+        float timer = 0.0f;
+        float timer_total = 0.0f;
+        bool active = false;
+    };
 
     struct Entity final {
         EntityKind kind = EntityKind::crate;
@@ -50,5 +56,6 @@ namespace kotte
         std::optional<BombState> bomb_state;
         std::optional<HealthState> health_state;
         std::optional<StatsState> stats_state;
+        std::optional<InvulnerabilityState> invulnerability_state;
     };
 }

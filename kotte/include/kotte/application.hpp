@@ -183,9 +183,10 @@ namespace kotte
         // start new data
         static constexpr int player_max_health_ = 5;
         static constexpr std::uint8_t player_init_bomb_reach_ = 1;
-        static constexpr std::uint8_t player_init_max_bomb_reach_ = 20;
+        static constexpr std::uint8_t player_init_max_bomb_reach_ = 10;
         static constexpr int player_bomb_count_ = 3;
         static constexpr float pickup_spawn_change_ = 0.1f;
+        static constexpr float player_invulnerability_timer_ = 0.3f;
         // end new data
         
         // start new state

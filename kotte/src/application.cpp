@@ -196,6 +196,16 @@ namespace kotte
                 state.blast_range
             });
         }
+        
+        // invulnerability timer update
+        auto& player_entity = player();
+        if (player_entity.invulnerability_state && player_entity.invulnerability_state->active) {
+            player_entity.invulnerability_state->timer -= delta_time;
+            if (player_entity.invulnerability_state->timer <= 0) {
+                player_entity.invulnerability_state->timer = 0.0f;
+                player_entity.invulnerability_state->active = false;    
+            }
+        }
     }
 
     void Application::resolve_gameplay_facts(){
@@ -232,17 +242,23 @@ namespace kotte
             if (entity == nullptr || !entity->health_state.has_value() || entity->health_state.value().is_dead) {
                 continue;
             }
+
+            // ignore invulnerable entities
+            if (entity->invulnerability_state && entity->invulnerability_state->active) {
+                continue;
+            }
             
+            // deal damage
             auto& health_state = entity->health_state.value();
-            
             health_state.health -= damage_entity_request.damage;
             if (health_state.health <= 0) {
                 health_state.is_dead = true;
-                if (entity->kind != EntityKind::player) {
-                    destroy_entity_requests_.push_back({damage_entity_request.entity});    
-                } else {
-                    // player died
-                }
+            }
+            
+            // start invulnerability timer
+            if (entity->invulnerability_state) {
+                entity->invulnerability_state->active = true;
+                entity->invulnerability_state->timer = entity->invulnerability_state->timer_total;
             }
         }
         
@@ -453,9 +469,10 @@ namespace kotte
             };
             
             auto query_result = spatial_grid_.query(entity_collision_bounds(bomb));
-            bool blocked = false;
+            bool placement_blocked = false;
             for (auto potential_blocker : query_result.entity_handles) {
                 auto entity = entities_.try_get(potential_blocker);
+                
                 if (!entity) {
                     continue;
                 }
@@ -464,13 +481,16 @@ namespace kotte
                     switch (entity->kind) {
                         case EntityKind::crate:
                         case EntityKind::bomb:
-                            blocked = true;
-                        default: break;
+                            placement_blocked = true;
+                        case EntityKind::player:
+                        case EntityKind::enemy:
+                        case EntityKind::pickup:
+                            break;
                     }
                 }
             }
             
-            if (blocked) {
+            if (placement_blocked) {
                 continue;
             }
             
@@ -680,6 +700,9 @@ namespace kotte
     }
 
     void Application::render_hud() {
+        const Font font = GetFontDefault();
+        constexpr auto fontSize = 20;
+        
         std::string diagnostics;
         
         diagnostics = std::format(
@@ -689,15 +712,16 @@ namespace kotte
         // game state debug
         diagnostics = std::format("Game State: {}", get_game_state_name(state_));
         
-        // calculate text positioning with right align
-        const Font font = GetFontDefault();
-        constexpr auto fontSize = 20;
+        
+        
         Rectangle textContainerRect = {
             static_cast<float>(window_.width()) - 220,
             static_cast<float>(window_.height()) - 78,
             200,
             24
         };
+        
+        // calculate text positioning with right align
         Vector2 textSize = MeasureTextEx(font, diagnostics.c_str(), (float)fontSize, fontSize*.1f);
         Vector2 textPos = {
             textContainerRect.x + Lerp(0.0f, textContainerRect.width  - textSize.x, ((float)2)*0.5f),
@@ -935,6 +959,11 @@ namespace kotte
                 .bomb_reach = player_init_bomb_reach_,
                 .max_bomb_reach = player_init_max_bomb_reach_,
                 .bomb_count = player_bomb_count_
+            },
+            .invulnerability_state = InvulnerabilityState{
+                .timer = 0.f,
+                .timer_total = player_invulnerability_timer_,
+                .active = false,
             }
         };
         player_handle_ = entities_.create(player_entity);
