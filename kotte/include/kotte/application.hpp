@@ -129,7 +129,7 @@ namespace kotte
             std::size_t visible_entities, std::size_t tiles_rendered, std::size_t exact_visibility_tests
         );
         void render_hud();
-        void render_start_hud();
+        void render_start_hud() const;
         void render();
         void render_game_over() const;
         void populate_entities();
@@ -187,10 +187,13 @@ namespace kotte
         static constexpr int player_bomb_count_ = 3;
         static constexpr float pickup_spawn_change_ = 0.1f;
         static constexpr float player_invulnerability_timer_ = 0.3f;
+        static constexpr int kills_to_win = 10;
         // end new data
         
         // start new state
         Game_Sate state_ = Game_Sate::Start;
+        bool show_debug_ = false;
+        int starting_enemies_ = 0;
         // end new state
         
         Window window_; // Constructed first, destroyed last.

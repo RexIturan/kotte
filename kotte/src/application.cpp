@@ -100,7 +100,10 @@ namespace kotte
             if (p_entity.health_state && p_entity.health_state.value().is_dead) {
                 state_ = Game_Sate::Lost;
             }
-            if (enemy_handles_.empty()) {
+            else if (starting_enemies_ - enemy_handles_.size() >= kills_to_win) {
+                state_ = Game_Sate::Won;
+            }
+            else if (enemy_handles_.empty()) {
                 state_ = Game_Sate::Won;
             }
         } else {
@@ -134,6 +137,15 @@ namespace kotte
         if(IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_Q)){
             request_exit();
         }
+        
+        if(IsKeyPressed(KEY_F1)){
+            show_debug_ = !show_debug_;
+        }
+        
+        if (IsKeyPressed(KEY_R)){
+            reset_game();
+        }
+        
         frame_actions_.place_bomb = IsKeyPressed(KEY_SPACE);
 
         Vector2& movement_direction = frame_actions_.player_movement_direction;
@@ -441,10 +453,12 @@ namespace kotte
 
         // Capture values rather than an Entity reference because the request
         // deliberately outlives this simulation phase.
-        const Vector2 player_bomb_place_offset = Vector2{0, entity_collision_bounds(player()).height/2}; 
+        
+        // potential change to make the bomb appear higher than directly on the "feet" of the player
+        // const Vector2 player_bomb_place_offset = Vector2{0, entity_collision_bounds(player()).height/2}; 
         place_bomb_requests_.push_back({
             player_handle_,
-            tile_centre(player().world_position - player_bomb_place_offset)
+            tile_centre(player().world_position)
         });
     }
 
@@ -703,14 +717,14 @@ namespace kotte
         const Font font = GetFontDefault();
         constexpr auto fontSize = 20;
         
-        std::string diagnostics;
+        std::string text;
         
-        diagnostics = std::format(
-            "Enemies: {}", enemy_handles_.size());
-        DrawText(diagnostics.c_str(), window_.width() - 150, window_.height() - 102, 20, LIGHTGRAY);    
+        text = std::format(
+            "Enemies: {} / {}", enemy_handles_.size(), starting_enemies_);
+        DrawText(text.c_str(), window_.width() - 200, window_.height() - 102, 20, LIGHTGRAY);    
         
         // game state debug
-        diagnostics = std::format("Game State: {}", get_game_state_name(state_));
+        text = std::format("Game State: {}", get_game_state_name(state_));
         
         
         
@@ -722,13 +736,13 @@ namespace kotte
         };
         
         // calculate text positioning with right align
-        Vector2 textSize = MeasureTextEx(font, diagnostics.c_str(), (float)fontSize, fontSize*.1f);
+        Vector2 textSize = MeasureTextEx(font, text.c_str(), (float)fontSize, fontSize*.1f);
         Vector2 textPos = {
             textContainerRect.x + Lerp(0.0f, textContainerRect.width  - textSize.x, ((float)2)*0.5f),
             textContainerRect.y + Lerp(0.0f, textContainerRect.height - textSize.y, ((float)0)*0.5f)
         };
         
-        DrawTextEx(font, diagnostics.c_str(), textPos, (float)fontSize, fontSize * .1f, LIGHTGRAY);
+        DrawTextEx(font, text.c_str(), textPos, (float)fontSize, fontSize * .1f, LIGHTGRAY);
         
         
         
@@ -736,21 +750,29 @@ namespace kotte
         
         if (player_entity.stats_state.has_value()) {
             auto stats = player_entity.stats_state.value();
-            diagnostics = std::format("Bomb reach: {}/{}", stats.bomb_reach, stats.max_bomb_reach);
-            DrawText(diagnostics.c_str(), window_.width() - 200, window_.height() - 54, 20, LIGHTGRAY);    
+            text = std::format("Bomb reach: {}/{}", stats.bomb_reach, stats.max_bomb_reach);
+            DrawText(text.c_str(), window_.width() - 200, window_.height() - 54, 20, LIGHTGRAY);    
         }
         
         if (player_entity.health_state.has_value()) {
             auto health_state = player_entity.health_state.value();
-            diagnostics = std::format(
+            text = std::format(
                 "Health: {}/{}", health_state.health, health_state.max_health);
         
             // bottom right
-            DrawText(diagnostics.c_str(), window_.width() - 150, window_.height() - 30, 20, LIGHTGRAY);    
+            DrawText(text.c_str(), window_.width() - 150, window_.height() - 30, 20, LIGHTGRAY);    
         }
+        
+        int killed = static_cast<int>(starting_enemies_ - enemy_handles_.size());
+        int to_kill_total = std::clamp(10, 0, starting_enemies_);
+        int to_kill = to_kill_total - killed;
+        text = std::format("kill {} more enemies", to_kill);
+        textSize = MeasureTextEx(font, text.c_str(), (float)fontSize, fontSize*.1f);
+        // bottom right
+        DrawText(text.c_str(), static_cast<int>(window_.width() / 2.f) - static_cast<int>(textSize.x / 2.f), 5, fontSize, LIGHTGRAY);  
     }
 
-    void Application::render_start_hud() {
+    void Application::render_start_hud() const {
         
         const Font font = GetFontDefault();
         constexpr auto fontSize = 40;
@@ -806,116 +828,120 @@ namespace kotte
     void Application::render(){
         Frame frame{background_color_};
 
-        const Rectangle world_view = camera_.world_view();
-        const TileRange visible_tiles = map_.tiles_overlapping(world_view, tile_size_);
-        std::size_t tiles_rendered = 0;
+        if (state_ == Game_Sate::Playing || state_ == Game_Sate::Won || state_ == Game_Sate::Lost) {
+            const Rectangle world_view = camera_.world_view();
+            const TileRange visible_tiles = map_.tiles_overlapping(world_view, tile_size_);
+            std::size_t tiles_rendered = 0;
 
-        for(int y = visible_tiles.first_row; y < visible_tiles.past_last_row; ++y){
-            for(int x = visible_tiles.first_column; x < visible_tiles.past_last_column; ++x){
-                const Tile& tile = map_.at(x, y);
-                const Color color = tile.type == TileType::wall
-                    ? wall_color_
-                    : floor_colors_[tile.variation % 3];
+            for(int y = visible_tiles.first_row; y < visible_tiles.past_last_row; ++y){
+                for(int x = visible_tiles.first_column; x < visible_tiles.past_last_column; ++x){
+                    const Tile& tile = map_.at(x, y);
+                    const Color color = tile.type == TileType::wall
+                        ? wall_color_
+                        : floor_colors_[tile.variation % 3];
 
-                const Vector2 tile_world_position{
-                    static_cast<float>(x * tile_size_),
-                    static_cast<float>(y * tile_size_)
-                };
-                const Vector2 tile_screen_position = camera_.world_to_screen(tile_world_position);
+                    const Vector2 tile_world_position{
+                        static_cast<float>(x * tile_size_),
+                        static_cast<float>(y * tile_size_)
+                    };
+                    const Vector2 tile_screen_position = camera_.world_to_screen(tile_world_position);
 
-                DrawRectangle(
-                    static_cast<int>(std::floor(tile_screen_position.x)),
-                    static_cast<int>(std::floor(tile_screen_position.y)),
-                    tile_size_ - 1,
-                    tile_size_ - 1,
-                    color);
-                ++tiles_rendered;
+                    DrawRectangle(
+                        static_cast<int>(std::floor(tile_screen_position.x)),
+                        static_cast<int>(std::floor(tile_screen_position.y)),
+                        tile_size_ - 1,
+                        tile_size_ - 1,
+                        color);
+                    ++tiles_rendered;
+                }
             }
-        }
 
-        const SpatialQuery spatial_query = spatial_grid_.query(world_view);
-        std::size_t exact_visibility_tests = 0;
-        std::size_t visible_entities = 0;
-        renderer_.clear();
+            const SpatialQuery spatial_query = spatial_grid_.query(world_view);
+            std::size_t exact_visibility_tests = 0;
+            std::size_t visible_entities = 0;
+            renderer_.clear();
 
-        // Blast effects are short-lived presentation values, not authoritative
-        // entities. Rebuilding commands here keeps their lifetime out of gameplay.
-        constexpr float blast_inset = 3.0f;
-        for(const BlastEffect& effect : blast_effects_){
-            for(const Vector2 tile_world_centre : effect.tile_centres){
-                Rectangle bounds{
-                    tile_world_centre.x - static_cast<float>(tile_size_) / 2.0f + blast_inset,
-                    tile_world_centre.y - static_cast<float>(tile_size_) / 2.0f + blast_inset,
-                    static_cast<float>(tile_size_) - blast_inset * 2.0f,
-                    static_cast<float>(tile_size_) - blast_inset * 2.0f
-                };
+            // Blast effects are short-lived presentation values, not authoritative
+            // entities. Rebuilding commands here keeps their lifetime out of gameplay.
+            constexpr float blast_inset = 3.0f;
+            for(const BlastEffect& effect : blast_effects_){
+                for(const Vector2 tile_world_centre : effect.tile_centres){
+                    Rectangle bounds{
+                        tile_world_centre.x - static_cast<float>(tile_size_) / 2.0f + blast_inset,
+                        tile_world_centre.y - static_cast<float>(tile_size_) / 2.0f + blast_inset,
+                        static_cast<float>(tile_size_) - blast_inset * 2.0f,
+                        static_cast<float>(tile_size_) - blast_inset * 2.0f
+                    };
+                    if(!CheckCollisionRecs(bounds, world_view)){
+                        continue;
+                    }
+
+                    const Vector2 screen_position = camera_.world_to_screen({bounds.x, bounds.y});
+                    bounds.x = screen_position.x;
+                    bounds.y = screen_position.y;
+                    renderer_.submit({
+                        bounds,
+                        blast_color_,
+                        RenderLayer::effect,
+                        tile_world_centre.y,
+                        0.3f
+                    });
+                }
+            }
+
+            // The spatial query replaces Week 3's complete entity scan. Its result is
+            // only a candidate list, so every candidate still needs an exact test.
+            for(const EntityHandle entity_handle : spatial_query.entity_handles){
+                const Entity* visible_candidate = entities_.try_get(entity_handle);
+                if(visible_candidate == nullptr){
+                    continue;
+                }
+
+                Rectangle bounds = entity_world_bounds(*visible_candidate);
+                ++exact_visibility_tests;
                 if(!CheckCollisionRecs(bounds, world_view)){
                     continue;
                 }
 
+                ++visible_entities;
                 const Vector2 screen_position = camera_.world_to_screen({bounds.x, bounds.y});
                 bounds.x = screen_position.x;
                 bounds.y = screen_position.y;
-                renderer_.submit({
-                    bounds,
-                    blast_color_,
-                    RenderLayer::effect,
-                    tile_world_centre.y,
-                    0.3f
-                });
+                const RenderLayer layer = visible_candidate->kind == EntityKind::bomb
+                    ? RenderLayer::ground
+                    : RenderLayer::world;
+                
+                
+                if (visible_candidate->kind == EntityKind::player
+                    && visible_candidate->health_state
+                    && visible_candidate->health_state.value().is_dead
+                ) {
+                    renderer_.submit({
+                        bounds,
+                        ColorBrightness(entity_color(visible_candidate->kind), -0.5),
+                        layer,
+                        visible_candidate->world_position.y,
+                        entity_roundness(visible_candidate->kind)
+                    });                
+                } else {
+                    renderer_.submit({
+                        bounds,
+                        entity_color(visible_candidate->kind),
+                        layer,
+                        visible_candidate->world_position.y,
+                        entity_roundness(visible_candidate->kind)
+                    });    
+                }
             }
-        }
+            renderer_.sort();
+            renderer_.execute();
 
-        // The spatial query replaces Week 3's complete entity scan. Its result is
-        // only a candidate list, so every candidate still needs an exact test.
-        for(const EntityHandle entity_handle : spatial_query.entity_handles){
-            const Entity* visible_candidate = entities_.try_get(entity_handle);
-            if(visible_candidate == nullptr){
-                continue;
+            if (show_debug_) {
+                render_debug_hud(visible_entities, tiles_rendered, exact_visibility_tests);    
             }
-
-            Rectangle bounds = entity_world_bounds(*visible_candidate);
-            ++exact_visibility_tests;
-            if(!CheckCollisionRecs(bounds, world_view)){
-                continue;
-            }
-
-            ++visible_entities;
-            const Vector2 screen_position = camera_.world_to_screen({bounds.x, bounds.y});
-            bounds.x = screen_position.x;
-            bounds.y = screen_position.y;
-            const RenderLayer layer = visible_candidate->kind == EntityKind::bomb
-                ? RenderLayer::ground
-                : RenderLayer::world;
             
-            
-            if (visible_candidate->kind == EntityKind::player
-                && visible_candidate->health_state
-                && visible_candidate->health_state.value().is_dead
-            ) {
-                renderer_.submit({
-                    bounds,
-                    ColorBrightness(entity_color(visible_candidate->kind), -0.5),
-                    layer,
-                    visible_candidate->world_position.y,
-                    entity_roundness(visible_candidate->kind)
-                });                
-            } else {
-                renderer_.submit({
-                    bounds,
-                    entity_color(visible_candidate->kind),
-                    layer,
-                    visible_candidate->world_position.y,
-                    entity_roundness(visible_candidate->kind)
-                });    
-            }
+            render_hud();
         }
-        renderer_.sort();
-        renderer_.execute();
-
-        render_debug_hud(visible_entities, tiles_rendered, exact_visibility_tests);
-        
-        render_hud();
         
         if (state_ == Game_Sate::Start) {
             render_start_hud();
@@ -1003,6 +1029,8 @@ namespace kotte
                 }
             }
         }
+        
+        starting_enemies_ = static_cast<int>(enemy_handles_.size());
     }
 
     void Application::initialize_enemies(){
