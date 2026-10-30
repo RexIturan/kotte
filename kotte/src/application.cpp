@@ -496,6 +496,7 @@ namespace kotte
                         case EntityKind::crate:
                         case EntityKind::bomb:
                             placement_blocked = true;
+                            break;
                         case EntityKind::player:
                         case EntityKind::enemy:
                         case EntityKind::pickup:
