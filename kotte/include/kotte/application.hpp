@@ -44,6 +44,8 @@ namespace kotte
             int window_width,
             int window_height,
             std::string_view title,
+            int tile_map_width,
+            int tile_map_height,
             std::uint64_t seed,
             int target_fps = 0);
 
@@ -218,6 +220,8 @@ namespace kotte
         std::vector<BlastEffect> blast_effects_;
         CollisionDiagnostics collision_diagnostics_;
         std::uint64_t seed_;
+        int room_width_;
+        int room_height_;
         EntityHandle player_handle_;
         bool exit_requested_ = false;
     };
